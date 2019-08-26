@@ -4,9 +4,9 @@ import (
 	"context"
 
 	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/pkg/apis/rabbitmq/v1alpha1"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -20,11 +20,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller_rabbitmq")
-
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
 
 // Add creates a new RabbitMQ Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -77,11 +72,6 @@ type ReconcileRabbitMQ struct {
 
 // Reconcile reads that state of the cluster for a RabbitMQ object and makes changes based on the state read
 // and what is in the RabbitMQ.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
-// Note:
-// The Controller will requeue the Request to be processed again if the returned error is non-nil or
-// Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling RabbitMQ")
@@ -100,54 +90,79 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		return reconcile.Result{}, err
 	}
 
-	// Define a new Pod object
-	pod := newPodForCR(instance)
+	// Define a new ConfigMap object
+	cm := newConfigMap(instance)
 
 	// Set RabbitMQ instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, cm, r.scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Check if this Pod already exists
-	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
+	// Check if this ConfigMap already exists
+	foundCM := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, foundCM)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-		err = r.client.Create(context.TODO(), pod)
+		reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "Pod.Name", cm.Name)
+		err = r.client.Create(context.TODO(), cm)
+		if err != nil {
+			reqLogger.Error(err, "Config Map creation has been failed")
+			return reconcile.Result{}, err
+		}
+		// ConfigMap created successfully - don't requeue
+	} else if err != nil {
+		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("Skip reconcile: ConfigMap already exists", "ConfigMap.Namespace", foundCM.Namespace, "StatefulSet.Name", foundCM.Name)
+	}
+
+	// Define a new Service object
+	rmqService := newService(instance)
+
+	// Set RabbitMQ instance as the owner and controller
+	if err := controllerutil.SetControllerReference(instance, rmqService, r.scheme); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Check if this Service already exists
+	foundRMQService := &corev1.Service{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: rmqService.Name, Namespace: rmqService.Namespace}, foundRMQService)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating a new Service", "StatefulSet.Namespace", rmqService.Namespace, "Pod.Name", rmqService.Name)
+		err = r.client.Create(context.TODO(), rmqService)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-
-		// Pod created successfully - don't requeue
-		return reconcile.Result{}, nil
+		// Service created successfully - don't requeue
 	} else if err != nil {
+		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("Skip reconcile: Service already exists", "Service.Namespace", foundRMQService.Namespace, "Service.Name", foundRMQService.Name)
+	}
+
+	// Define a new StatefulSet object
+	ss := newStatefulSet(instance)
+
+	// Set RabbitMQ instance as the owner and controller
+	if err := controllerutil.SetControllerReference(instance, ss, r.scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Pod already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
+	// Check if this StatefulSet already exists
+	foundSS := &v1.StatefulSet{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: ss.Name, Namespace: ss.Namespace}, foundSS)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating a new StatefulSet", "StatefulSet.Namespace", ss.Namespace, "Pod.Name", ss.Name)
+		err = r.client.Create(context.TODO(), ss)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		// StatefulSet created successfully - don't requeue
+	} else if err != nil {
+		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("Skip reconcile: StatefulSet already exists", "StatefulSet.Namespace", foundSS.Namespace, "StatefulSet.Name", foundSS.Name)
+	}
+
 	return reconcile.Result{}, nil
 }
 
-// newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Pod {
-	labels := map[string]string{
-		"app": cr.Name,
-	}
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-pod",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "busybox",
-					Image:   "busybox",
-					Command: []string{"sleep", "3600"},
-				},
-			},
-		},
-	}
-}

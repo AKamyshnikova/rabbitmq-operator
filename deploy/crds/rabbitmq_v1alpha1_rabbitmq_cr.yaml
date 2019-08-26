@@ -4,4 +4,7 @@ metadata:
   name: example-rabbitmq
 spec:
   # Add fields here
-  size: 3
+  replicas: 3
+  image: rabbitmq:3.7
+  service_account: rabbitmq
+  discovery_service: rabbitmq

@@ -4,15 +4,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // RabbitMQSpec defines the desired state of RabbitMQ
 // +k8s:openapi-gen=true
 type RabbitMQSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	Replicas 			int32 	`json:"replicas"`
+	Image				string	`json:"image"`
+	ServiceAccount		string	`json:"service_account"`
+	DiscoveryService	string 	`json:"discovery_service"`
+	Vhost 				string 	`json:"vhost,omitempty"`
 }
 
 // RabbitMQStatus defines the observed state of RabbitMQ
