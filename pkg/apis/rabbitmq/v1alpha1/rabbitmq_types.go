@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -12,6 +13,7 @@ type RabbitMQSpec struct {
 	ServiceAccount		string	`json:"service_account"`
 	DiscoveryService	string 	`json:"discovery_service"`
 	Vhost 				string 	`json:"vhost,omitempty"`
+	DataVolumeSize		resource.Quantity	`json:"data_volume_size"`
 }
 
 // RabbitMQStatus defines the observed state of RabbitMQ

@@ -42,26 +42,26 @@ func newConfigMap(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.ConfigMap {
 	rabbitmqPlugins := "[rabbitmq_management,rabbitmq_peer_discovery_k8s]."
 
 	rabbitmqConf := `## Cluster formation. See https://www.rabbitmq.com/cluster-formation.html to learn more.
-	cluster_formation.peer_discovery_backend  = rabbit_peer_discovery_k8s
-	cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
-	## Should RabbitMQ node name be computed from the pod's hostname or IP address?
-	## IP addresses are not stable, so using [stable] hostnames is recommended when possible.
-	## Set to "hostname" to use pod hostnames.
-	## When this value is changed, so should the variable used to set the RABBITMQ_NODENAME
-	## environment variable.
-	cluster_formation.k8s.address_type = ip
-	## How often should node cleanup checks run?
-	cluster_formation.node_cleanup.interval = 30
-	## Set to false if automatic removal of unknown/absent nodes
-	## is desired. This can be dangerous, see
-	##  * https://www.rabbitmq.com/cluster-formation.html#node-health-checks-and-cleanup
-	##  * https://groups.google.com/forum/#!msg/rabbitmq-users/wuOfzEywHXo/k8z_HWIkBgAJ
-	cluster_formation.node_cleanup.only_log_warning = true
-	cluster_partition_handling = autoheal
-	## See https://www.rabbitmq.com/ha.html#master-migration-data-locality
-	queue_master_locator=min-masters
-	## See https://www.rabbitmq.com/access-control.html#loopback-users
-	loopback_users.guest = false`
+cluster_formation.peer_discovery_backend  = rabbit_peer_discovery_k8s
+cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+## Should RabbitMQ node name be computed from the pod's hostname or IP address?
+## IP addresses are not stable, so using [stable] hostnames is recommended when possible.
+## Set to "hostname" to use pod hostnames.
+## When this value is changed, so should the variable used to set the RABBITMQ_NODENAME
+## environment variable.
+cluster_formation.k8s.address_type = ip
+## How often should node cleanup checks run?
+cluster_formation.node_cleanup.interval = 30
+## Set to false if automatic removal of unknown/absent nodes
+## is desired. This can be dangerous, see
+##  * https://www.rabbitmq.com/cluster-formation.html#node-health-checks-and-cleanup
+##  * https://groups.google.com/forum/#!msg/rabbitmq-users/wuOfzEywHXo/k8z_HWIkBgAJ
+cluster_formation.node_cleanup.only_log_warning = true
+cluster_partition_handling = autoheal
+## See https://www.rabbitmq.com/ha.html#master-migration-data-locality
+queue_master_locator=min-masters
+## See https://www.rabbitmq.com/access-control.html#loopback-users
+loopback_users.guest = false`
 
 
 	return &corev1.ConfigMap{
@@ -132,6 +132,10 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 				Name:      "config-volume",
 				MountPath: "/etc/rabbitmq",
 			},
+			{
+				Name:      "rabbitmq-data",
+				MountPath: "/var/lib/rabbitmq",
+			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			InitialDelaySeconds: 20,
@@ -195,6 +199,25 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		},
 	}
 
+	pvcTemplate := []corev1.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "rabbitmq-data",
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: cr.Spec.DataVolumeSize,
+					},
+				},
+			},
+		},
+	}
+
 	return &v1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
@@ -209,6 +232,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 			Replicas:		&cr.Spec.Replicas,
 			Template:   	podTemplate,
 			ServiceName: 	cr.Name,
+			VolumeClaimTemplates: pvcTemplate,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -218,4 +242,3 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		},
 	}
 }
-
