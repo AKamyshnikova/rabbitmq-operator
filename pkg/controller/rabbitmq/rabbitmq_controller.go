@@ -46,9 +46,26 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner RabbitMQ
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &rabbitmqv1alpha1.RabbitMQ{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to secondary resource Service and requeue the owner RabbitMQ
+	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &rabbitmqv1alpha1.RabbitMQ{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to secondary resource Statefulset and requeue the owner RabbitMQ
+	err = c.Watch(&source.Kind{Type: &v1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &rabbitmqv1alpha1.RabbitMQ{},
 	})
