@@ -43,7 +43,7 @@ func newConfigMap(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.ConfigMap {
 
 	rabbitmqConf := `## Cluster formation. See https://www.rabbitmq.com/cluster-formation.html to learn more.
 cluster_formation.peer_discovery_backend  = rabbit_peer_discovery_k8s
-cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+cluster_formation.k8s.host = kubernetes.default.svc
 ## Should RabbitMQ node name be computed from the pod's hostname or IP address?
 ## IP addresses are not stable, so using [stable] hostnames is recommended when possible.
 ## Set to "hostname" to use pod hostnames.
