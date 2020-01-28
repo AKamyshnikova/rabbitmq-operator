@@ -214,6 +214,8 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 						corev1.ResourceStorage: cr.Spec.DataVolumeSize,
 					},
 				},
+
+				StorageClassName: &cr.Spec.DataStorageClass,
 			},
 		},
 	}

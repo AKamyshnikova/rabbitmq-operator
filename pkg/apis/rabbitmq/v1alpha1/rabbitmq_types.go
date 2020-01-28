@@ -14,6 +14,7 @@ type RabbitMQSpec struct {
 	DiscoveryService	string 	`json:"discovery_service"`
 	Vhost 				string 	`json:"vhost,omitempty"`
 	DataVolumeSize		resource.Quantity	`json:"data_volume_size"`
+	DataStorageClass    string  `json:"dataStorageClass,omitempty"`
 }
 
 // RabbitMQStatus defines the observed state of RabbitMQ
