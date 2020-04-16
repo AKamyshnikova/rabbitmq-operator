@@ -1,0 +1,27 @@
+run:
+  timeout: 5m
+  skip-files:
+  - "zz_generated\\."
+output:
+  uniq-by-line: false
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+  # allow dot-importing ginkgo and gomega
+  - linters: [golint, stylecheck]
+    source: '\. "github\.com/onsi/(gomega|ginkgo)"'
+    text: "should not use dot imports"
+  # ignore capitalised error strings for now
+  - linters: [stylecheck]
+    text: "ST1005:"
+  # ignore that switch x.(type) check for now
+  - linters: [gosimple]
+    text: "S1034:"
+linters:
+  enable:
+  - gofmt
+  - golint
+  - goimports
+  - goprintffuncname
+  - stylecheck

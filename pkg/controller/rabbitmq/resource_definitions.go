@@ -9,7 +9,7 @@ import (
 
 func newService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
 	labels := map[string]string{
-		"app": "rabbitmq",
+		"app":  "rabbitmq",
 		"type": "LoadBalancer",
 	}
 	selector := map[string]string{"app": "rabbitmq"}
@@ -17,21 +17,21 @@ func newService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.DiscoveryService,
 			Namespace: cr.Namespace,
-			Labels: labels,
+			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
 			Selector: selector,
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "http",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       15672,
+					Name:     "http",
+					Protocol: corev1.ProtocolTCP,
+					Port:     15672,
 				},
 				{
-					Name:       "amqp",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       5672,
+					Name:     "amqp",
+					Protocol: corev1.ProtocolTCP,
+					Port:     5672,
 				},
 			},
 		},
@@ -63,7 +63,6 @@ queue_master_locator=min-masters
 ## See https://www.rabbitmq.com/access-control.html#loopback-users
 loopback_users.guest = false`
 
-
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rabbitmq-config",
@@ -75,7 +74,6 @@ loopback_users.guest = false`
 		},
 	}
 }
-
 
 func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 	labels := map[string]string{
@@ -122,8 +120,8 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 				ContainerPort: 15672,
 			},
 			{
-				Name:	"amqp",
-				Protocol: corev1.ProtocolTCP,
+				Name:          "amqp",
+				Protocol:      corev1.ProtocolTCP,
 				ContainerPort: 5672,
 			},
 		},
@@ -173,7 +171,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		},
 		Spec: corev1.PodSpec{
 			ServiceAccountName: cr.Spec.ServiceAccount,
-			Containers: podContainers,
+			Containers:         podContainers,
 			Volumes: []corev1.Volume{
 				{
 					Name: "config-volume",
@@ -184,11 +182,11 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 							},
 							Items: []corev1.KeyToPath{
 								{
-									Key: "rabbitmq.conf",
+									Key:  "rabbitmq.conf",
 									Path: "rabbitmq.conf",
 								},
 								{
-									Key: "enabled_plugins",
+									Key:  "enabled_plugins",
 									Path: "enabled_plugins",
 								},
 							},
@@ -202,7 +200,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 	pvcTemplate := []corev1.PersistentVolumeClaim{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   "rabbitmq-data",
+				Name: "rabbitmq-data",
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -226,14 +224,14 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      	cr.Name,
-			Namespace: 	cr.Namespace,
-			Labels:		labels,
+			Name:      cr.Name,
+			Namespace: cr.Namespace,
+			Labels:    labels,
 		},
 		Spec: v1.StatefulSetSpec{
-			Replicas:		&cr.Spec.Replicas,
-			Template:   	podTemplate,
-			ServiceName: 	cr.Name,
+			Replicas:             &cr.Spec.Replicas,
+			Template:             podTemplate,
+			ServiceName:          cr.Name,
 			VolumeClaimTemplates: pvcTemplate,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,

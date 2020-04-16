@@ -182,4 +182,3 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 
 	return reconcile.Result{}, nil
 }
-
