@@ -163,6 +163,30 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		},
 	}
 
+	if cr.Spec.Affinity == nil {
+		cr.Spec.Affinity = &corev1.Affinity{
+			PodAntiAffinity: &corev1.PodAntiAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+					{
+						Weight: 20,
+						PodAffinityTerm: corev1.PodAffinityTerm{
+							TopologyKey: "kubernetes.io/hostname",
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "app",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{cr.GetName()},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
 	podContainers = append(podContainers, rabbitmqContainer)
 
 	podTemplate := corev1.PodTemplateSpec{
@@ -194,6 +218,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 					},
 				},
 			},
+			Affinity: cr.Spec.Affinity,
 		},
 	}
 

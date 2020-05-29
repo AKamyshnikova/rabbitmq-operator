@@ -5,6 +5,7 @@
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -40,7 +41,7 @@ func (in *RabbitMQ) DeepCopyObject() runtime.Object {
 func (in *RabbitMQList) DeepCopyInto(out *RabbitMQList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]RabbitMQ, len(*in))
@@ -73,6 +74,11 @@ func (in *RabbitMQList) DeepCopyObject() runtime.Object {
 func (in *RabbitMQSpec) DeepCopyInto(out *RabbitMQSpec) {
 	*out = *in
 	out.DataVolumeSize = in.DataVolumeSize.DeepCopy()
+	if in.Affinity != nil {
+		in, out := &in.Affinity, &out.Affinity
+		*out = new(v1.Affinity)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
