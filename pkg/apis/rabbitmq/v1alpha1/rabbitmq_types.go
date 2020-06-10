@@ -9,14 +9,15 @@ import (
 // RabbitMQSpec defines the desired state of RabbitMQ
 // +k8s:openapi-gen=true
 type RabbitMQSpec struct {
-	Replicas         int32             `json:"replicas"`
-	Image            string            `json:"image"`
-	ServiceAccount   string            `json:"service_account"`
-	DiscoveryService string            `json:"discovery_service"`
-	Vhost            string            `json:"vhost,omitempty"`
-	DataVolumeSize   resource.Quantity `json:"data_volume_size"`
-	DataStorageClass string            `json:"dataStorageClass,omitempty"`
-	Affinity         *corev1.Affinity  `json:"affinity,omitempty"`
+	Replicas         int32                        `json:"replicas"`
+	Image            string                       `json:"image"`
+	ServiceAccount   string                       `json:"service_account"`
+	DiscoveryService string                       `json:"discovery_service"`
+	Vhost            string                       `json:"vhost,omitempty"`
+	DataVolumeSize   resource.Quantity            `json:"data_volume_size"`
+	DataStorageClass string                       `json:"dataStorageClass,omitempty"`
+	Affinity         *corev1.Affinity             `json:"affinity,omitempty"`
+	Resources        *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // RabbitMQStatus defines the observed state of RabbitMQ

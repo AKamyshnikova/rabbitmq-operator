@@ -187,6 +187,10 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		}
 	}
 
+	if cr.Spec.Resources != nil {
+		rabbitmqContainer.Resources = *cr.Spec.Resources
+	}
+
 	podContainers = append(podContainers, rabbitmqContainer)
 
 	podTemplate := corev1.PodTemplateSpec{
