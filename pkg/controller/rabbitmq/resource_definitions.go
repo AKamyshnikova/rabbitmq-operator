@@ -79,7 +79,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 	labels := map[string]string{
 		"app": "rabbitmq",
 	}
-
+	dataVolumeName := "rabbitmq-data"
 	podContainers := []corev1.Container{}
 
 	// container with rabbitmq
@@ -131,7 +131,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 				MountPath: "/etc/rabbitmq",
 			},
 			{
-				Name:      "rabbitmq-data",
+				Name:      dataVolumeName,
 				MountPath: "/var/lib/rabbitmq",
 			},
 		},
@@ -226,28 +226,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		},
 	}
 
-	pvcTemplate := []corev1.PersistentVolumeClaim{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "rabbitmq-data",
-			},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{
-					corev1.ReadWriteOnce,
-				},
-
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: cr.Spec.DataVolumeSize,
-					},
-				},
-
-				StorageClassName: &cr.Spec.DataStorageClass,
-			},
-		},
-	}
-
-	return &v1.StatefulSet{
+	ss := &v1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1",
@@ -258,10 +237,9 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 			Labels:    labels,
 		},
 		Spec: v1.StatefulSetSpec{
-			Replicas:             &cr.Spec.Replicas,
-			Template:             podTemplate,
-			ServiceName:          cr.Name,
-			VolumeClaimTemplates: pvcTemplate,
+			Replicas:    &cr.Spec.Replicas,
+			Template:    podTemplate,
+			ServiceName: cr.Name,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -270,4 +248,36 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 			},
 		},
 	}
+
+	if !cr.Spec.DataVolumeSize.IsZero() {
+		pvcTemplates := []corev1.PersistentVolumeClaim{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "rabbitmq-data",
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: cr.Spec.DataVolumeSize,
+						},
+					},
+
+					StorageClassName: &cr.Spec.DataStorageClass,
+				},
+			},
+		}
+
+		ss.Spec.VolumeClaimTemplates = pvcTemplates
+	} else {
+		ss.Spec.Template.Spec.Volumes = append(ss.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name:         dataVolumeName,
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+		})
+	}
+
+	return ss
 }
