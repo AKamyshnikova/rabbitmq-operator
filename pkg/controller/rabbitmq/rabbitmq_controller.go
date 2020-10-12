@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"context"
+	"reflect"
 
 	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/pkg/apis/rabbitmq/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
@@ -176,8 +177,18 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		// StatefulSet created successfully - don't requeue
 	} else if err != nil {
 		return reconcile.Result{}, err
+	}
+
+	if reflect.DeepEqual(foundSS.Spec, ss.Spec) {
+		reqLogger.Info("RabbitMQ StatefulSet already exists and looks updated", "Name", foundSS.Name)
 	} else {
-		reqLogger.Info("Skip reconcile: StatefulSet already exists", "StatefulSet.Namespace", foundSS.Namespace, "StatefulSet.Name", foundSS.Name)
+		reqLogger.Info("Update RabbitMQ StatefulSet", "Namespace", ss.Namespace, "Name", ss.Name)
+		ss.ObjectMeta.ResourceVersion = foundSS.ObjectMeta.ResourceVersion
+		err = r.client.Update(context.TODO(), ss)
+		if err != nil {
+			reqLogger.Error(err, "RabbitMQ StatefulSet cannot be updated")
+			return reconcile.Result{}, err
+		}
 	}
 
 	return reconcile.Result{}, nil
