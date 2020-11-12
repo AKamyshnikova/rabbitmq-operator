@@ -157,6 +157,32 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		reqLogger.Info("Skip reconcile: Service already exists", "Service.Namespace", foundRMQService.Namespace, "Service.Name", foundRMQService.Name)
 	}
 
+	if instance.Spec.ExporterPort > 0 {
+		// Define a new Exporter Service object
+		rmqExporterService := newExporterService(instance)
+
+		// Set RabbitMQ instance as the owner and controller
+		if err := controllerutil.SetControllerReference(instance, rmqExporterService, r.scheme); err != nil {
+			return reconcile.Result{}, err
+		}
+
+		// Check if this Exporter Service already exists
+		foundrmqExporterService := &corev1.Service{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: rmqExporterService.Name, Namespace: rmqExporterService.Namespace}, foundrmqExporterService)
+		if err != nil && errors.IsNotFound(err) {
+			reqLogger.Info("Creating a new Service", "StatefulSet.Namespace", rmqExporterService.Namespace, "Pod.Name", rmqExporterService.Name)
+			err = r.client.Create(context.TODO(), rmqExporterService)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			// Service created successfully - don't requeue
+		} else if err != nil {
+			return reconcile.Result{}, err
+		} else {
+			reqLogger.Info("Skip reconcile: Service already exists", "Service.Namespace", foundrmqExporterService.Namespace, "Service.Name", foundrmqExporterService.Name)
+		}
+	}
+
 	// Define a new StatefulSet object
 	ss := newStatefulSet(instance)
 
@@ -188,6 +214,40 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		if err != nil {
 			reqLogger.Error(err, "RabbitMQ StatefulSet cannot be updated")
 			return reconcile.Result{}, err
+		}
+	}
+
+	if instance.Spec.ExporterPort > 0 {
+		exporter := newDeployment(instance)
+
+		if err := controllerutil.SetControllerReference(instance, exporter, r.scheme); err != nil {
+			return reconcile.Result{}, err
+		}
+
+		// Check if this StatefulSet already exists
+		foundExporter := &v1.Deployment{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: exporter.Name, Namespace: exporter.Namespace}, foundExporter)
+		if err != nil && errors.IsNotFound(err) {
+			reqLogger.Info("Creating a new Deployment", "StatefulSet.Namespace", exporter.Namespace, "Pod.Name", exporter.Name)
+			err = r.client.Create(context.TODO(), exporter)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			// StatefulSet created successfully - don't requeue
+		} else if err != nil {
+			return reconcile.Result{}, err
+		}
+
+		if reflect.DeepEqual(foundExporter.Spec, exporter.Spec) {
+			reqLogger.Info("RabbitMQ Exporter Deployment already exists and looks updated", "Name", foundExporter.Name)
+		} else {
+			reqLogger.Info("Update RabbitMQ Exporter Deployment", "Namespace", exporter.Namespace, "Name", exporter.Name)
+			ss.ObjectMeta.ResourceVersion = foundExporter.ObjectMeta.ResourceVersion
+			err = r.client.Update(context.TODO(), exporter)
+			if err != nil {
+				reqLogger.Error(err, "RabbitMQ Exporter Deployment cannot be updated")
+				return reconcile.Result{}, err
+			}
 		}
 	}
 

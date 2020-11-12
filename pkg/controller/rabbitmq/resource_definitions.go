@@ -1,10 +1,13 @@
 package rabbitmq
 
 import (
+	"strconv"
+
 	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/pkg/apis/rabbitmq/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func newService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
@@ -26,12 +29,42 @@ func newService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
 				{
 					Name:     "http",
 					Protocol: corev1.ProtocolTCP,
-					Port:     15672,
+					Port:     DefaultRabbitHTTPPort,
 				},
 				{
 					Name:     "amqp",
 					Protocol: corev1.ProtocolTCP,
-					Port:     5672,
+					Port:     DefaultRabbitAMQPPort,
+				},
+			},
+		},
+	}
+}
+
+func newExporterService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
+	labels := map[string]string{
+		"application": "prometheus_rabbitmq_exporter",
+		"component":   "metrics",
+	}
+	selector := map[string]string{"application": "prometheus_rabbitmq_exporter"}
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "tf-rabbitmq-exporter",
+			Namespace: cr.Namespace,
+			Labels:    labels,
+			Annotations: map[string]string{
+				"prometheus.io/scrape": "true",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: selector,
+			Ports: []corev1.ServicePort{
+				{
+					TargetPort: intstr.IntOrString{IntVal: cr.Spec.ExporterPort},
+					Port:       cr.Spec.ExporterPort,
+					Protocol:   corev1.ProtocolTCP,
+					Name:       "metrics",
 				},
 			},
 		},
@@ -82,6 +115,21 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 	dataVolumeName := "rabbitmq-data"
 	podContainers := []corev1.Container{}
 
+	//  RABBITMQ_DEFAULT_USER
+	if len(cr.Spec.DefaultUsername) == 0 {
+		cr.Spec.DefaultUsername = DefaultRabbitUser
+	}
+
+	//  RABBITMQ_DEFAULT_PASS
+	if len(cr.Spec.DefaultPassword) == 0 {
+		cr.Spec.DefaultPassword = DefaultRabbitPassword
+	}
+
+	// RABBITMQ_DEFAULT_VHOST
+	if len(cr.Spec.DefaultVHost) == 0 {
+		cr.Spec.DefaultVHost = DefaultRabbitVHost
+	}
+
 	// container with rabbitmq
 	rabbitmqContainer := corev1.Container{
 		Name:  "rabbitmq",
@@ -112,17 +160,29 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 				Name:  "RABBITMQ_ERLANG_COOKIE",
 				Value: "mycookie",
 			},
+			{
+				Name:  "RABBITMQ_DEFAULT_USER",
+				Value: cr.Spec.DefaultUsername,
+			},
+			{
+				Name:  "RABBITMQ_DEFAULT_PASS",
+				Value: cr.Spec.DefaultPassword,
+			},
+			{
+				Name:  "RABBITMQ_DEFAULT_VHOST",
+				Value: cr.Spec.DefaultVHost,
+			},
 		},
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "http",
 				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: 15672,
+				ContainerPort: DefaultRabbitHTTPPort,
 			},
 			{
 				Name:          "amqp",
 				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: 5672,
+				ContainerPort: DefaultRabbitAMQPPort,
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -189,30 +249,6 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 
 	if cr.Spec.Resources != nil {
 		rabbitmqContainer.Resources = *cr.Spec.Resources
-	}
-
-	//  RABBITMQ_DEFAULT_USER
-	if len(cr.Spec.DefaultUsername) > 0 {
-		rabbitmqContainer.Env = append(rabbitmqContainer.Env, corev1.EnvVar{
-			Name:  "RABBITMQ_DEFAULT_USER",
-			Value: cr.Spec.DefaultUsername,
-		})
-	}
-
-	//  RABBITMQ_DEFAULT_PASS
-	if len(cr.Spec.DefaultPassword) > 0 {
-		rabbitmqContainer.Env = append(rabbitmqContainer.Env, corev1.EnvVar{
-			Name:  "RABBITMQ_DEFAULT_PASS",
-			Value: cr.Spec.DefaultPassword,
-		})
-	}
-
-	// RABBITMQ_DEFAULT_VHOST
-	if len(cr.Spec.DefaultVHost) > 0 {
-		rabbitmqContainer.Env = append(rabbitmqContainer.Env, corev1.EnvVar{
-			Name:  "RABBITMQ_DEFAULT_VHOST",
-			Value: cr.Spec.DefaultVHost,
-		})
 	}
 
 	podContainers = append(podContainers, rabbitmqContainer)
@@ -304,4 +340,124 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 	}
 
 	return ss
+}
+
+func newDeployment(cr *rabbitmqv1alpha1.RabbitMQ) *v1.Deployment {
+	labels := map[string]string{
+		"application": "prometheus_rabbitmq_exporter",
+		"component":   "metrics",
+	}
+	podContainers := []corev1.Container{}
+	exporterContainer := corev1.Container{
+		Name:  "exporter",
+		Image: cr.Spec.ExporterImage,
+		Env: []corev1.EnvVar{
+			{
+				Name:  "RABBIT_HTTP_PORT",
+				Value: strconv.Itoa(DefaultRabbitHTTPPort),
+			},
+			{
+				Name:  "RABBIT_URL",
+				Value: "http://amqp:$(RABBIT_HTTP_PORT)",
+			},
+			{
+				Name:  "RABBIT_USER",
+				Value: cr.Spec.DefaultUsername,
+			},
+			{
+				Name:  "RABBIT_PASSWORD",
+				Value: cr.Spec.DefaultPassword,
+			},
+			{
+				Name:  "RABBITMQ_DEFAULT_VHOST",
+				Value: cr.Spec.DefaultVHost,
+			},
+			{
+				Name:  "RABBIT_CAPABILITIES",
+				Value: "no_sort,",
+			},
+			{
+				Name:  "PUBLISH_PORT",
+				Value: strconv.Itoa(int(cr.Spec.ExporterPort)),
+			},
+			{
+				Name:  "LOG_LEVEL",
+				Value: "info",
+			},
+			{
+				Name:  "SKIPVERIFY",
+				Value: "1",
+			},
+			{
+				Name:  "SKIP_QUEUES",
+				Value: "^$",
+			},
+			{
+				Name:  "INCLUDE_QUEUES",
+				Value: ".*",
+			},
+			{
+				Name:  "RABBIT_EXPORTERS",
+				Value: "overview,exchange,node",
+			},
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          "metrics",
+				Protocol:      corev1.ProtocolTCP,
+				ContainerPort: cr.Spec.ExporterPort,
+			},
+		},
+		ReadinessProbe: &corev1.Probe{
+			InitialDelaySeconds: 30,
+			TimeoutSeconds:      5,
+			PeriodSeconds:       30,
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Port:   intstr.IntOrString{IntVal: cr.Spec.ExporterPort},
+					Scheme: "HTTP",
+				},
+			},
+		},
+		LivenessProbe: &corev1.Probe{
+			InitialDelaySeconds: 30,
+			TimeoutSeconds:      5,
+			PeriodSeconds:       30,
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Port:   intstr.IntOrString{IntVal: cr.Spec.ExporterPort},
+					Scheme: "HTTP",
+				},
+			},
+		},
+	}
+	podContainers = append(podContainers, exporterContainer)
+	podTemplate := corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: cr.Spec.ServiceAccount,
+			Containers:         podContainers,
+		},
+	}
+
+	exporter := &v1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "tf-rabbit-exporter",
+			Namespace: cr.Namespace,
+			Labels:    labels,
+		},
+		Spec: v1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: podTemplate,
+		},
+	}
+	return exporter
 }

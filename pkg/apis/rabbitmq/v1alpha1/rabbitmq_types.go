@@ -21,6 +21,8 @@ type RabbitMQSpec struct {
 	DefaultUsername  string                       `json:"defaultUsername,omitempty"`
 	DefaultPassword  string                       `json:"defaultPassword,omitempty"`
 	DefaultVHost     string                       `json:"defaultVHost,omitempty"`
+	ExporterImage    string                       `json:"exporter_image,omitempty"`
+	ExporterPort     int32                        `json:"exporter_port,omitempty"`
 }
 
 // RabbitMQStatus defines the observed state of RabbitMQ
