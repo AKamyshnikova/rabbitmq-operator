@@ -191,6 +191,30 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		rabbitmqContainer.Resources = *cr.Spec.Resources
 	}
 
+	//  RABBITMQ_DEFAULT_USER
+	if len(cr.Spec.DefaultUsername) > 0 {
+		rabbitmqContainer.Env = append(rabbitmqContainer.Env, corev1.EnvVar{
+			Name:  "RABBITMQ_DEFAULT_USER",
+			Value: cr.Spec.DefaultUsername,
+		})
+	}
+
+	//  RABBITMQ_DEFAULT_PASS
+	if len(cr.Spec.DefaultPassword) > 0 {
+		rabbitmqContainer.Env = append(rabbitmqContainer.Env, corev1.EnvVar{
+			Name:  "RABBITMQ_DEFAULT_PASS",
+			Value: cr.Spec.DefaultPassword,
+		})
+	}
+
+	// RABBITMQ_DEFAULT_VHOST
+	if len(cr.Spec.DefaultVHost) > 0 {
+		rabbitmqContainer.Env = append(rabbitmqContainer.Env, corev1.EnvVar{
+			Name:  "RABBITMQ_DEFAULT_VHOST",
+			Value: cr.Spec.DefaultVHost,
+		})
+	}
+
 	podContainers = append(podContainers, rabbitmqContainer)
 
 	podTemplate := corev1.PodTemplateSpec{

@@ -18,6 +18,9 @@ type RabbitMQSpec struct {
 	DataStorageClass string                       `json:"dataStorageClass,omitempty"`
 	Affinity         *corev1.Affinity             `json:"affinity,omitempty"`
 	Resources        *corev1.ResourceRequirements `json:"resources,omitempty"`
+	DefaultUsername  string                       `json:"defaultUsername,omitempty"`
+	DefaultPassword  string                       `json:"defaultPassword,omitempty"`
+	DefaultVHost     string                       `json:"defaultVHost,omitempty"`
 }
 
 // RabbitMQStatus defines the observed state of RabbitMQ
