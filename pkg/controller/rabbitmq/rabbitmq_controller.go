@@ -170,7 +170,7 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		foundrmqExporterService := &corev1.Service{}
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: rmqExporterService.Name, Namespace: rmqExporterService.Namespace}, foundrmqExporterService)
 		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating a new Service", "StatefulSet.Namespace", rmqExporterService.Namespace, "Pod.Name", rmqExporterService.Name)
+			reqLogger.Info("Creating a new Service", "Service.Namespace", rmqExporterService.Namespace, "Service.Name", rmqExporterService.Name)
 			err = r.client.Create(context.TODO(), rmqExporterService)
 			if err != nil {
 				return reconcile.Result{}, err
@@ -228,12 +228,12 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		foundExporter := &v1.Deployment{}
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: exporter.Name, Namespace: exporter.Namespace}, foundExporter)
 		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating a new Deployment", "StatefulSet.Namespace", exporter.Namespace, "Pod.Name", exporter.Name)
+			reqLogger.Info("Creating a new Exporter Deployment", "Deployment.Namespace", exporter.Namespace, "Deployment.Name", exporter.Name)
 			err = r.client.Create(context.TODO(), exporter)
 			if err != nil {
 				return reconcile.Result{}, err
 			}
-			// StatefulSet created successfully - don't requeue
+			// Deployment created successfully - don't requeue
 		} else if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -242,7 +242,7 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 			reqLogger.Info("RabbitMQ Exporter Deployment already exists and looks updated", "Name", foundExporter.Name)
 		} else {
 			reqLogger.Info("Update RabbitMQ Exporter Deployment", "Namespace", exporter.Namespace, "Name", exporter.Name)
-			ss.ObjectMeta.ResourceVersion = foundExporter.ObjectMeta.ResourceVersion
+			exporter.ObjectMeta.ResourceVersion = foundExporter.ObjectMeta.ResourceVersion
 			err = r.client.Update(context.TODO(), exporter)
 			if err != nil {
 				reqLogger.Error(err, "RabbitMQ Exporter Deployment cannot be updated")
