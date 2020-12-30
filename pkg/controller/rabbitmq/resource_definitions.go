@@ -304,7 +304,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 				MatchLabels: labels,
 			},
 			UpdateStrategy: v1.StatefulSetUpdateStrategy{
-				Type: v1.OnDeleteStatefulSetStrategyType,
+				Type: v1.RollingUpdateStatefulSetStrategyType,
 			},
 		},
 	}
