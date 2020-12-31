@@ -89,7 +89,7 @@ cluster_formation.node_cleanup.interval = 30
 ## is desired. This can be dangerous, see
 ##  * https://www.rabbitmq.com/cluster-formation.html#node-health-checks-and-cleanup
 ##  * https://groups.google.com/forum/#!msg/rabbitmq-users/wuOfzEywHXo/k8z_HWIkBgAJ
-cluster_formation.node_cleanup.only_log_warning = false
+cluster_formation.node_cleanup.only_log_warning = true
 cluster_partition_handling = autoheal
 ## See https://www.rabbitmq.com/ha.html#master-migration-data-locality
 queue_master_locator=min-masters
