@@ -157,6 +157,30 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		reqLogger.Info("Skip reconcile: Service already exists", "Service.Namespace", foundRMQService.Namespace, "Service.Name", foundRMQService.Name)
 	}
 
+	// Define a new Headless Service object
+	rmqHeadlessService := newHeadlessService(instance)
+
+	// Set RabbitMQ instance as the owner and controller
+	if err := controllerutil.SetControllerReference(instance, rmqHeadlessService, r.scheme); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Check if this Service already exists
+	foundRMQHeadlessService := &corev1.Service{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: rmqHeadlessService.Name, Namespace: rmqHeadlessService.Namespace}, foundRMQHeadlessService)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating a new Service", "Service.Namespace", rmqHeadlessService.Namespace, "Service.Name", rmqHeadlessService.Name)
+		err = r.client.Create(context.TODO(), rmqHeadlessService)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		// Service created successfully - don't requeue
+	} else if err != nil {
+		return reconcile.Result{}, err
+	} else {
+		reqLogger.Info("Skip reconcile: Service already exists", "Service.Namespace", foundRMQHeadlessService.Namespace, "Service.Name", foundRMQHeadlessService.Name)
+	}
+
 	if instance.Spec.ExporterPort > 0 {
 		// Define a new Exporter Service object
 		rmqExporterService := newExporterService(instance)
