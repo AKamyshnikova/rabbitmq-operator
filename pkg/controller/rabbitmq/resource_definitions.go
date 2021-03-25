@@ -1,7 +1,6 @@
 package rabbitmq
 
 import (
-	"fmt"
 	"strconv"
 
 	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/pkg/apis/rabbitmq/v1alpha1"
@@ -13,13 +12,13 @@ import (
 
 func newService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
 	labels := map[string]string{
-		"app":  DefaultRabbitAppName,
+		"app":  "rabbitmq",
 		"type": "LoadBalancer",
 	}
-	selector := map[string]string{"app": DefaultRabbitAppName}
+	selector := map[string]string{"app": "rabbitmq"}
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DefaultRabbitServiceName,
+			Name:      cr.Spec.DiscoveryService,
 			Namespace: cr.Namespace,
 			Labels:    labels,
 		},
@@ -36,37 +35,6 @@ func newService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
 					Name:     "amqp",
 					Protocol: corev1.ProtocolTCP,
 					Port:     DefaultRabbitAMQPPort,
-				},
-			},
-		},
-	}
-}
-
-func newHeadlessService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
-	labels := map[string]string{
-		"app": DefaultRabbitAppName,
-	}
-	selector := map[string]string{"app": DefaultRabbitAppName}
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      DefaultRabbitDiscoveryService,
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.ServiceSpec{
-			Type:      corev1.ServiceTypeClusterIP,
-			ClusterIP: "None",
-			Selector:  selector,
-			Ports: []corev1.ServicePort{
-				{
-					Name:     "cluster-rpc",
-					Protocol: corev1.ProtocolTCP,
-					Port:     DefaultRabbitClusterPort,
-				},
-				{
-					Name:     "epmd",
-					Protocol: corev1.ProtocolTCP,
-					Port:     DefaultRabbitEPMDPort,
 				},
 			},
 		},
@@ -106,16 +74,15 @@ func newExporterService(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.Service {
 func newConfigMap(cr *rabbitmqv1alpha1.RabbitMQ) *corev1.ConfigMap {
 	rabbitmqPlugins := "[rabbitmq_management,rabbitmq_peer_discovery_k8s]."
 
-	rabbitmqConf := fmt.Sprintf(`## Cluster formation. See https://www.rabbitmq.com/cluster-formation.html to learn more.
+	rabbitmqConf := `## Cluster formation. See https://www.rabbitmq.com/cluster-formation.html to learn more.
 cluster_formation.peer_discovery_backend  = rabbit_peer_discovery_k8s
-cluster_formation.k8s.service_name = %s
 cluster_formation.k8s.host = kubernetes.default.svc
 ## Should RabbitMQ node name be computed from the pod's hostname or IP address?
 ## IP addresses are not stable, so using [stable] hostnames is recommended when possible.
 ## Set to "hostname" to use pod hostnames.
 ## When this value is changed, so should the variable used to set the RABBITMQ_NODENAME
 ## environment variable.
-cluster_formation.k8s.address_type = hostname
+cluster_formation.k8s.address_type = ip
 ## How often should node cleanup checks run?
 cluster_formation.node_cleanup.interval = 30
 ## Set to false if automatic removal of unknown/absent nodes
@@ -127,7 +94,7 @@ cluster_partition_handling = autoheal
 ## See https://www.rabbitmq.com/ha.html#master-migration-data-locality
 queue_master_locator=min-masters
 ## See https://www.rabbitmq.com/access-control.html#loopback-users
-loopback_users.guest = false`, DefaultRabbitDiscoveryService)
+loopback_users.guest = false`
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -178,25 +145,16 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 				},
 			},
 			{
-				Name: "HOSTNAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath:  "metadata.name",
-						APIVersion: "v1",
-					},
-				},
-			},
-			{
 				Name:  "RABBITMQ_USE_LONGNAME",
-				Value: "false",
+				Value: "true",
 			},
 			{
 				Name:  "RABBITMQ_NODENAME",
-				Value: "rabbit@$(HOSTNAME)",
+				Value: "rabbit@$(MY_POD_IP)",
 			},
 			{
 				Name:  "K8S_SERVICE_NAME",
-				Value: DefaultRabbitDiscoveryService,
+				Value: cr.Spec.DiscoveryService,
 			},
 			{
 				Name:  "RABBITMQ_ERLANG_COOKIE",
@@ -225,11 +183,6 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 				Name:          "amqp",
 				Protocol:      corev1.ProtocolTCP,
 				ContainerPort: DefaultRabbitAMQPPort,
-			},
-			{
-				Name:          "epmd",
-				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: 4369,
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
@@ -283,7 +236,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 									{
 										Key:      "app",
 										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{DefaultRabbitAppName},
+										Values:   []string{cr.GetName()},
 									},
 								},
 							},
@@ -346,7 +299,7 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 		Spec: v1.StatefulSetSpec{
 			Replicas:    &cr.Spec.Replicas,
 			Template:    podTemplate,
-			ServiceName: DefaultRabbitDiscoveryService,
+			ServiceName: cr.Name,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -405,7 +358,7 @@ func newDeployment(cr *rabbitmqv1alpha1.RabbitMQ) *v1.Deployment {
 			},
 			{
 				Name:  "RABBIT_URL",
-				Value: fmt.Sprintf("http://%s:$(RABBIT_HTTP_PORT)", DefaultRabbitServiceName),
+				Value: "http://amqp:$(RABBIT_HTTP_PORT)",
 			},
 			{
 				Name:  "RABBIT_USER",
