@@ -92,6 +92,9 @@ help: ## Display this help
 		/^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } \
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+crds:
+	operator-sdk generate crds --crd-version v1
+
 export CGO_ENABLED=0
 
 test: ## Run tests. Using with param example: $ make type=cover test
