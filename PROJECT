@@ -1,0 +1,6 @@
+domain: rabbitmq.mirantis.com
+layout: go.kubebuilder.io/v2
+plugins:
+  go.operator-sdk.io/v2-alpha: {}
+repo: github.com/toha10/rabbitmq-operator
+version: "3-alpha"

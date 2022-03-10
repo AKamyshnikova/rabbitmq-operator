@@ -1,102 +1,57 @@
-package rabbitmq
+/*
+Copyright 2022.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controllers
 
 import (
 	"context"
 	"reflect"
 
-	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/pkg/apis/rabbitmq/v1alpha1"
+	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/api/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log = logf.Log.WithName("controller_rabbitmq")
 
-// Add creates a new RabbitMQ Controller and adds it to the Manager. The Manager will set fields on the Controller
-// and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+// RabbitMQReconciler reconciles a RabbitMQ object
+type RabbitMQReconciler struct {
+	Client client.Client
+	Scheme *runtime.Scheme
 }
 
-// newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileRabbitMQ{client: mgr.GetClient(), scheme: mgr.GetScheme()}
-}
-
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
-	c, err := controller.New("rabbitmq-controller", mgr, controller.Options{Reconciler: r})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to primary resource RabbitMQ
-	err = c.Watch(&source.Kind{Type: &rabbitmqv1alpha1.RabbitMQ{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource Pods and requeue the owner RabbitMQ
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &rabbitmqv1alpha1.RabbitMQ{},
-	})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource Service and requeue the owner RabbitMQ
-	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &rabbitmqv1alpha1.RabbitMQ{},
-	})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource Statefulset and requeue the owner RabbitMQ
-	err = c.Watch(&source.Kind{Type: &v1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &rabbitmqv1alpha1.RabbitMQ{},
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// blank assignment to verify that ReconcileRabbitMQ implements reconcile.Reconciler
-var _ reconcile.Reconciler = &ReconcileRabbitMQ{}
-
-// ReconcileRabbitMQ reconciles a RabbitMQ object
-type ReconcileRabbitMQ struct {
-	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
-}
-
-// Reconcile reads that state of the cluster for a RabbitMQ object and makes changes based on the state read
-// and what is in the RabbitMQ.Spec
-func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+//+kubebuilder:rbac:groups=rabbitmq.mirantis.com,resources=rabbitmqs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rabbitmq.mirantis.com,resources=rabbitmqs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=rabbitmq.mirantis.com,resources=rabbitmqs/finalizers,verbs=update
+func (r *RabbitMQReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	reqLogger := log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 	reqLogger.Info("Reconciling RabbitMQ")
 
 	// Fetch the RabbitMQ instance
 	instance := &rabbitmqv1alpha1.RabbitMQ{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -112,16 +67,16 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 	cm := newConfigMap(instance)
 
 	// Set RabbitMQ instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, cm, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, cm, r.Scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this ConfigMap already exists
 	foundCM := &corev1.ConfigMap{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, foundCM)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, foundCM)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new ConfigMap", "ConfigMap.Namespace", cm.Namespace, "Pod.Name", cm.Name)
-		err = r.client.Create(context.TODO(), cm)
+		err = r.Client.Create(context.TODO(), cm)
 		if err != nil {
 			reqLogger.Error(err, "Config Map creation has been failed")
 			return reconcile.Result{}, err
@@ -137,16 +92,16 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 	rmqService := newService(instance)
 
 	// Set RabbitMQ instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, rmqService, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, rmqService, r.Scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this Service already exists
 	foundRMQService := &corev1.Service{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: rmqService.Name, Namespace: rmqService.Namespace}, foundRMQService)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: rmqService.Name, Namespace: rmqService.Namespace}, foundRMQService)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new Service", "StatefulSet.Namespace", rmqService.Namespace, "Pod.Name", rmqService.Name)
-		err = r.client.Create(context.TODO(), rmqService)
+		err = r.Client.Create(context.TODO(), rmqService)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -161,16 +116,16 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 	rmqHeadlessService := newHeadlessService(instance)
 
 	// Set RabbitMQ instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, rmqHeadlessService, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, rmqHeadlessService, r.Scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this Service already exists
 	foundRMQHeadlessService := &corev1.Service{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: rmqHeadlessService.Name, Namespace: rmqHeadlessService.Namespace}, foundRMQHeadlessService)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: rmqHeadlessService.Name, Namespace: rmqHeadlessService.Namespace}, foundRMQHeadlessService)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new Service", "Service.Namespace", rmqHeadlessService.Namespace, "Service.Name", rmqHeadlessService.Name)
-		err = r.client.Create(context.TODO(), rmqHeadlessService)
+		err = r.Client.Create(context.TODO(), rmqHeadlessService)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -186,16 +141,16 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		rmqExporterService := newExporterService(instance)
 
 		// Set RabbitMQ instance as the owner and controller
-		if err := controllerutil.SetControllerReference(instance, rmqExporterService, r.scheme); err != nil {
+		if err := controllerutil.SetControllerReference(instance, rmqExporterService, r.Scheme); err != nil {
 			return reconcile.Result{}, err
 		}
 
 		// Check if this Exporter Service already exists
 		foundrmqExporterService := &corev1.Service{}
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: rmqExporterService.Name, Namespace: rmqExporterService.Namespace}, foundrmqExporterService)
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: rmqExporterService.Name, Namespace: rmqExporterService.Namespace}, foundrmqExporterService)
 		if err != nil && errors.IsNotFound(err) {
 			reqLogger.Info("Creating a new Service", "Service.Namespace", rmqExporterService.Namespace, "Service.Name", rmqExporterService.Name)
-			err = r.client.Create(context.TODO(), rmqExporterService)
+			err = r.Client.Create(context.TODO(), rmqExporterService)
 			if err != nil {
 				return reconcile.Result{}, err
 			}
@@ -211,16 +166,16 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 	ss := newStatefulSet(instance)
 
 	// Set RabbitMQ instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, ss, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, ss, r.Scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	// Check if this StatefulSet already exists
 	foundSS := &v1.StatefulSet{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: ss.Name, Namespace: ss.Namespace}, foundSS)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ss.Name, Namespace: ss.Namespace}, foundSS)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new StatefulSet", "StatefulSet.Namespace", ss.Namespace, "Pod.Name", ss.Name)
-		err = r.client.Create(context.TODO(), ss)
+		err = r.Client.Create(context.TODO(), ss)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -234,7 +189,7 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 	} else {
 		reqLogger.Info("Update RabbitMQ StatefulSet", "Namespace", ss.Namespace, "Name", ss.Name)
 		ss.ObjectMeta.ResourceVersion = foundSS.ObjectMeta.ResourceVersion
-		err = r.client.Update(context.TODO(), ss)
+		err = r.Client.Update(context.TODO(), ss)
 		if err != nil {
 			reqLogger.Error(err, "RabbitMQ StatefulSet cannot be updated")
 			return reconcile.Result{}, err
@@ -244,16 +199,16 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 	if instance.Spec.ExporterPort > 0 {
 		exporter := newDeployment(instance)
 
-		if err := controllerutil.SetControllerReference(instance, exporter, r.scheme); err != nil {
+		if err := controllerutil.SetControllerReference(instance, exporter, r.Scheme); err != nil {
 			return reconcile.Result{}, err
 		}
 
 		// Check if this StatefulSet already exists
 		foundExporter := &v1.Deployment{}
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: exporter.Name, Namespace: exporter.Namespace}, foundExporter)
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: exporter.Name, Namespace: exporter.Namespace}, foundExporter)
 		if err != nil && errors.IsNotFound(err) {
 			reqLogger.Info("Creating a new Exporter Deployment", "Deployment.Namespace", exporter.Namespace, "Deployment.Name", exporter.Name)
-			err = r.client.Create(context.TODO(), exporter)
+			err = r.Client.Create(context.TODO(), exporter)
 			if err != nil {
 				return reconcile.Result{}, err
 			}
@@ -267,7 +222,7 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		} else {
 			reqLogger.Info("Update RabbitMQ Exporter Deployment", "Namespace", exporter.Namespace, "Name", exporter.Name)
 			exporter.ObjectMeta.ResourceVersion = foundExporter.ObjectMeta.ResourceVersion
-			err = r.client.Update(context.TODO(), exporter)
+			err = r.Client.Update(context.TODO(), exporter)
 			if err != nil {
 				reqLogger.Error(err, "RabbitMQ Exporter Deployment cannot be updated")
 				return reconcile.Result{}, err
@@ -275,5 +230,15 @@ func (r *ReconcileRabbitMQ) Reconcile(request reconcile.Request) (reconcile.Resu
 		}
 	}
 
-	return reconcile.Result{}, nil
+	return ctrl.Result{}, nil
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *RabbitMQReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&rabbitmqv1alpha1.RabbitMQ{}).
+		Owns(&corev1.Pod{}).
+		Owns(&corev1.Service{}).
+		Owns(&v1.StatefulSet{}).
+		Complete(r)
 }

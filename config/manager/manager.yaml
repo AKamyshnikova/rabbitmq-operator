@@ -16,9 +16,11 @@ spec:
       containers:
         - name: rabbitmq-operator
           # Replace this with the built image name
-          image: REPLACE_IMAGE
+          image: controller:latest
+          args:
+            - "--metrics-bind-address=127.0.0.1:60000"
           command:
-          - rabbitmq-operator
+            - rabbitmq-operator
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE

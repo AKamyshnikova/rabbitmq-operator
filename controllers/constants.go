@@ -1,4 +1,4 @@
-package rabbitmq
+package controllers
 
 const (
 	//DefaultRabbitExporterPublishPort = 9095

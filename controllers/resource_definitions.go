@@ -1,10 +1,10 @@
-package rabbitmq
+package controllers
 
 import (
 	"fmt"
 	"strconv"
 
-	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/pkg/apis/rabbitmq/v1alpha1"
+	rabbitmqv1alpha1 "github.com/toha10/rabbitmq-operator/api/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
