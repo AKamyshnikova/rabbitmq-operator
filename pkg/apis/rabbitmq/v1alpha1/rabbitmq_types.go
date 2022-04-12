@@ -9,8 +9,10 @@ import (
 // RabbitMQSpec defines the desired state of RabbitMQ
 // +k8s:openapi-gen=true
 type RabbitMQSpec struct {
-	Replicas         int32                        `json:"replicas"`
-	Image            string                       `json:"image"`
+	Replicas int32  `json:"replicas"`
+	Image    string `json:"image"`
+	// +kubebuilder:default:="Always"
+	ImagePullPolicy  corev1.PullPolicy            `json:"imagePullPolicy,omitempty"`
 	ServiceAccount   string                       `json:"service_account"`
 	DiscoveryService string                       `json:"discovery_service,omitempty"`
 	Vhost            string                       `json:"vhost,omitempty"`

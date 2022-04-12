@@ -165,8 +165,9 @@ func newStatefulSet(cr *rabbitmqv1alpha1.RabbitMQ) *v1.StatefulSet {
 
 	// container with rabbitmq
 	rabbitmqContainer := corev1.Container{
-		Name:  "rabbitmq",
-		Image: cr.Spec.Image,
+		Name:            "rabbitmq",
+		Image:           cr.Spec.Image,
+		ImagePullPolicy: cr.Spec.ImagePullPolicy,
 		Env: []corev1.EnvVar{
 			{
 				Name: "MY_POD_IP",
@@ -409,8 +410,9 @@ func newDeployment(cr *rabbitmqv1alpha1.RabbitMQ) *v1.Deployment {
 	}
 	podContainers := []corev1.Container{}
 	exporterContainer := corev1.Container{
-		Name:  "exporter",
-		Image: cr.Spec.ExporterImage,
+		Name:            "exporter",
+		Image:           cr.Spec.ExporterImage,
+		ImagePullPolicy: cr.Spec.ImagePullPolicy,
 		Env: []corev1.EnvVar{
 			{
 				Name:  "RABBIT_HTTP_PORT",
